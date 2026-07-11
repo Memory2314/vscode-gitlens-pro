@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 
 ## [Unreleased]
 
+## [18.3.0] - 2026-07-09
+
 ### Added
 
 - Adds ConfigCat-based feature flag service for A/B testing and experimentation support ([#5092](https://github.com/gitkraken/vscode-gitlens/issues/5092))
@@ -48,6 +50,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 - Changes copying changes to a worktree to no longer prompt to open that worktree afterward
 - Changes stashing to use the _Commit Graph_ working changes (WIP) commit-box draft message when one is present
 - Renames the _Open Worktree File_ action to _Open File (Worktree)_ for consistency with the new _Open Changes with Working File (Worktree)_ action
+- Changes how paused merge, rebase, cherry-pick, and revert operations with conflicts are surfaced &mdash; a single surface now opens: the _Commit Graph_'s working changes (WIP) details with the conflict banner, or the _Interactive Rebase Editor_ for rebases when the _Commit Graph_ is unavailable. Previously a rebase conflict could simultaneously open the rebase editor, force-focus the _Commits_ view, and show a toast offering to open the already-opening editor. The _Commits_ view is no longer force-focused by any paused operation, the rebase conflict toasts no longer offer _Open Rebase Editor_, and _Show Conflicts_ now consistently opens the _Commit Graph_ from all locations, including inside the rebase editor; interactive rebase pauses (todo editing, `edit`, `reword`, `break`) still open the rebase editor
 
 ### Removed
 
@@ -7064,7 +7067,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 
 - Initial release but still heavily a work in progress.
 
-[unreleased]: https://github.com/gitkraken/vscode-gitlens/compare/v18.2.0...HEAD
+[unreleased]: https://github.com/gitkraken/vscode-gitlens/compare/v18.3.0...HEAD
+[18.3.0]: https://github.com/gitkraken/vscode-gitlens/compare/v18.2.0...gitkraken:v18.3.0
 [18.2.0]: https://github.com/gitkraken/vscode-gitlens/compare/v18.1.0...gitkraken:v18.2.0
 [18.1.0]: https://github.com/gitkraken/vscode-gitlens/compare/v18.0.0...gitkraken:v18.1.0
 [18.0.0]: https://github.com/gitkraken/vscode-gitlens/compare/v17.12.2...gitkraken:v18.0.0

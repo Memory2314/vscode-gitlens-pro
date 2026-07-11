@@ -55,6 +55,7 @@ import type { ExpandState, GlDetailsAgentStatus } from './gl-details-agent-statu
 import { expandVisibleCategories } from './gl-details-agent-status.js';
 import type { FileCompareBetweenDetail } from './gl-details-compare-mode-panel.js';
 import { hasOnlyWip } from './gl-details-compare-mode-panel.js';
+import type { GlDetailsComposeModePanel } from './gl-details-compose-mode-panel.js';
 import type { GlDetailsResolveModePanel } from './gl-details-resolve-mode-panel.js';
 import type {
 	ReviewAnalyzeAreaDetail,
@@ -1812,6 +1813,11 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 		// "Stale" covers both: cached content shown while loading, and current content shown while
 		// a background refresh is running.
 		const stale = resolved != null && (this.isLoading || current == null);
+		// Interaction guard: block pointer input ONLY while the shown content belongs to the
+		// *outgoing* selection (a different one is loading) — a click then would act on the wrong
+		// commit/worktree. When the current selection is merely refreshing (its own files/enrichment
+		// still streaming in), the content is correct, so it stays interactive. Implies `stale`.
+		const blockPointer = resolved != null && current == null;
 		const compareSheetOpen = this._state.compareSheetOpen.get();
 		const compareAsPanel = this._state.compareAsPanel.get();
 
@@ -1827,7 +1833,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 			aria-label=${resolved?.ariaLabel ?? 'Commit details'}
 			aria-busy=${resolved == null || stale}
 			aria-live="polite"
-			class=${stale ? 'details-content details-stale' : 'details-content'}
+			class=${`details-content${stale ? ' details-stale' : ''}${blockPointer ? ' details-replacing' : ''}`}
 			?inert=${compareSheetOpen || this._conflictSheet != null}
 		>
 			${resolved != null
@@ -2209,9 +2215,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 				return;
 			}
 
-			const panel = this.querySelector<import('./gl-details-compose-mode-panel.js').GlDetailsComposeModePanel>(
-				'gl-details-compose-mode-panel',
-			);
+			const panel = this.querySelector<GlDetailsComposeModePanel>('gl-details-compose-mode-panel');
 			const excludedFiles = panel?.excludedFiles.size ? [...panel.excludedFiles] : undefined;
 			const aiExcludedFiles = this._state.aiExcludedFiles.get();
 			this._workflow.runCompose(
@@ -2269,6 +2273,8 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 			.aiModel=${this._state.aiModel.get()}
 			.lastPrompt=${composeEntry?.prompt}
 			.basePrompt=${composeEntry?.basePrompt}
+			.refineMode=${composeEntry?.refineMode ?? false}
+			.refineDraft=${composeEntry?.refineDraft}
 			.progressMessage=${this._state.composeProgressMessage.get()}
 			?applying=${this._state.composeApplying.get()}
 			?forward-available=${this._state.composeForwardAvailable.get()}
@@ -2287,9 +2293,7 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 			@compose-forward-invalidate=${() => this._workflow.compose.invalidateSnapshot()}
 			@compose-error-back=${() => this._workflow.compose.backFromError()}
 			@compose-error-retry=${() => {
-				const panel = this.querySelector<
-					import('./gl-details-compose-mode-panel.js').GlDetailsComposeModePanel
-				>('gl-details-compose-mode-panel');
+				const panel = this.querySelector<GlDetailsComposeModePanel>('gl-details-compose-mode-panel');
 				const excludedFiles = panel?.excludedFiles.size ? [...panel.excludedFiles] : undefined;
 				const aiExcludedFiles = this._state.aiExcludedFiles.get();
 				this._workflow.compose.retryFromError(
@@ -2844,6 +2848,8 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 			.retryingFiles=${this._state.resolveRetryingFiles.get()}
 			.stagingFiles=${this._state.resolveStagingFiles.get()}
 			.lastPrompt=${resolveEntry?.prompt}
+			.refineMode=${resolveEntry?.refineMode ?? false}
+			.refineDraft=${resolveEntry?.refineDraft}
 			@resolve-run=${(e: CustomEvent<{ prompt?: string }>) => {
 				// Same model gate as compose/review — open the picker first when no model is set.
 				if (this._state.aiModel.get() == null) {
@@ -3298,6 +3304,22 @@ export class GlGraphDetailsPanel extends SignalWatcher(LitElement) {
 
 		const existing = this._graphState?.wipDrafts?.[repoPath];
 		this.persistWipDraft(repoPath, { message: message, messageDirty: true, amend: existing?.amend });
+	}
+
+	/** {@link DetailsWorkflowHost.readEngagedRefineState} — read the live compose/resolve panel's
+	 *  ready-state Refine posture + unsubmitted draft, so the controller can persist them onto the
+	 *  engaged entry on mode-leave. Returns undefined when no refine-capable panel is mounted. */
+	readEngagedRefineState(): { refineMode: boolean; refineDraft: string } | undefined {
+		const mode = this._state.activeMode.get();
+		if (mode === 'compose') {
+			const panel = this.querySelector<GlDetailsComposeModePanel>('gl-details-compose-mode-panel');
+			return panel != null ? { refineMode: panel.refineModeLive, refineDraft: panel.refineDraftLive } : undefined;
+		}
+		if (mode === 'resolve') {
+			const panel = this.querySelector<GlDetailsResolveModePanel>('gl-details-resolve-mode-panel');
+			return panel != null ? { refineMode: panel.refineModeLive, refineDraft: panel.refineDraftLive } : undefined;
+		}
+		return undefined;
 	}
 
 	/** Derive the `generating` spinner from the registry for the current WIP. Reading `runningOperations`
